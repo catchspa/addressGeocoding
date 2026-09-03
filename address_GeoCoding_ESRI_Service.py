@@ -83,7 +83,7 @@ def geocode_arcgis(address):
 
 # Read addresses + unique IDs from CSV
 input_rows = []
-with open("addresses_18000.csv", newline="", encoding="utf-8") as f:
+with open("addresses_34000.csv", newline="", encoding="utf-8") as f:
     reader = csv.DictReader(f)
     for row in reader:
         input_rows.append((row["unique_id"], row["address"]))
@@ -101,7 +101,7 @@ print(f"Loaded {total} rows from GitHub.")
 start_time = time.time()  # total timer start
 
 # Write results to output CSV
-with open("geocoded_output_18000.csv", "w", newline="", encoding="utf-8") as f:
+with open("geocoded_output_34000.csv", "w", newline="", encoding="utf-8") as f:
     writer = csv.DictWriter(
         f,
         fieldnames=["unique_id",
@@ -143,5 +143,5 @@ with open("geocoded_output_18000.csv", "w", newline="", encoding="utf-8") as f:
 # Compute total time AFTER loop finishes
 total_time = time.time() - start_time
 
-print("Done. Results saved to geocoded_output_18000.csv")
+print("Done. Results saved to geocoded_output_34000.csv")
 print(f"Total time taken: {total_time:.1f} seconds")
