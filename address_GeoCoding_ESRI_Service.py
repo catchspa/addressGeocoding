@@ -8,6 +8,8 @@ import time
 import requests
 import io
 
+import itertools
+
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 HEADERS = {"User-Agent": "GitHubGeocoderDemo/1.0"}
 
@@ -62,7 +64,10 @@ def geocode_arcgis(address):
     params = {
         "f": "json",
         "singleLine": address,
-        "outFields": "*"
+        "outFields": "location",
+        "countryCode": "AU",
+        #"outSR": "4383" # GCS_WGS_1984
+        #"outSR": "7844"  # GDA2020
     }
 
     response = requests.get(url, params=params)
@@ -82,7 +87,7 @@ def geocode_arcgis(address):
     return lat, lon, "OK"
 
 
-def process_input_addresses(input_file="addresses.csv", start_line_number=1, count=20000, start_time=None, filename_suffix=None):
+def process_input_addresses(input_file="all_addresses.csv", start_line_number=1, count=20000, start_time=None, filename_suffix=None, delimiter=","):
     # Read addresses + unique IDs from CSV
     # input_rows = []
     start_index = start_line_number - 1
@@ -90,10 +95,19 @@ def process_input_addresses(input_file="addresses.csv", start_line_number=1, cou
 
     end_line_number = end_index + 1
 
-    output_file = f"geocoded_output_{filename_suffix}.csv" if filename_suffix else f"geocoded_output_{end_line_number}.csv"
+    output_file = f"geocoded_output_{filename_suffix}.csv" if filename_suffix else f"geocoded_output_{start_line_number}_{end_line_number}.csv"
+
+    # for row in reader:
+    #     print(row)
 
     with open(input_file, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+
+        reader = csv.reader(f)
+        headers = next(reader, None)
+        sliced = itertools.islice(f, start_index - 1 if start_index else 0, end_index, 1)  # Skip first 14 lines
+
+        # reader = csv.DictReader(f)
+        reader = csv.DictReader(sliced, fieldnames=headers,  delimiter=delimiter)
 
         with open(output_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
@@ -116,9 +130,9 @@ def process_input_addresses(input_file="addresses.csv", start_line_number=1, cou
     #
     # print(f"Loaded {total} rows from GitHub.")
 
-    # -----------------------------
-    # PROCESS + WRITE OUTPUT CSV
-    # -----------------------------
+# -----------------------------
+# PROCESS + WRITE OUTPUT CSV
+# -----------------------------
 def process_row(row, writer, current_line_number, start_time, total=2000):
 
         (unique_id, addr) = (row["unique_id"], row["address"])
@@ -146,7 +160,7 @@ def process_row(row, writer, current_line_number, start_time, total=2000):
                 "lon_gda94": lon_gda94
             })
 
-        time.sleep(0.25)   # Nominatim rate limit
+        time.sleep(0.1)   # Nominatim rate limit
 
 
 
@@ -167,21 +181,20 @@ if __name__ == "__main__":
 
 
     # this sample "addresses_34000.csv"
-    input_file = "addresses_34000.csv"
-    start_line_number = 1
-    count = 16_841
+    input_file = "/Users/mchalla/dev/github/addressGeocoding/new_45k_addresses.csv"
+    start_line_number = 10001
+    count = 10
 
 
-    (output_file, start_line_number) = process_input_addresses(
+    (output_file, end_line_number) = process_input_addresses(
         input_file=input_file,
         start_line_number=start_line_number,
         count=count if count else 20_000,
         start_time=start_time,
-        filename_suffix="34000"
     )
 
     # Compute total time AFTER loop finishes
     total_time = time.time() - start_time
 
-    print(f"Done. Results saved to {output_file} (rows {1}-{start_line_number})")
+    print(f"Done. Results saved to {output_file} (rows {start_line_number}-{end_line_number})")
     print(f"Total time taken: {total_time:.1f} seconds")
