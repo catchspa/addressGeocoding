@@ -6,6 +6,7 @@ import json
 import csv
 import time
 import requests
+import os
 import io
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
@@ -52,7 +53,6 @@ def geocode_address(address):
     return lat, lon, "OK"
 
 
-
 # -----------------------------
 # Geocode using ARCGIS
 # -----------------------------
@@ -62,7 +62,7 @@ def geocode_arcgis(address):
     params = {
         "f": "json",
         "singleLine": address,
-        "outFields": "*"
+        "outFields": "location"
     }
 
     response = requests.get(url, params=params)
@@ -73,16 +73,16 @@ def geocode_arcgis(address):
     if not candidates:
         return None, None, "None"
 
-
     # ArcGIS returns x = longitude, y = latitude
     loc = candidates[0]["location"]
     lon = loc["x"]
     lat = loc["y"]
-    
+
     return lat, lon, "OK"
 
 
-def process_input_addresses(input_file="addresses.csv", start_line_number=1, count=20000, start_time=None, filename_suffix=None):
+def process_input_addresses(input_file="addresses.csv", start_line_number=1, count=20000, start_time=None,
+                            filename_suffix=None):
     # Read addresses + unique IDs from CSV
     # input_rows = []
     start_index = start_line_number - 1
@@ -90,7 +90,7 @@ def process_input_addresses(input_file="addresses.csv", start_line_number=1, cou
 
     end_line_number = end_index + 1
 
-    output_file = f"geocoded_output_{filename_suffix}.csv" if filename_suffix else f"geocoded_output_{end_line_number}.csv"
+    output_file = f"geocoded_output_{filename_suffix}.csv" if filename_suffix else f"geocoded_output_{start_line_number}_{end_line_number}.csv"
 
     with open(input_file, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -105,8 +105,9 @@ def process_input_addresses(input_file="addresses.csv", start_line_number=1, cou
             )
 
             for index, row in enumerate(reader, start=start_index):
-                #input_rows.append((row["unique_id"], row["address"]))
-                process_row(row, writer, index+1, start_time=start_time, total=count)
+                # input_rows.append((row["unique_id"], row["address"]))
+                process_row(row, writer, index + 1, start_time=start_time, total=count)
+
                 if index >= end_index:
                     break
 
@@ -119,69 +120,67 @@ def process_input_addresses(input_file="addresses.csv", start_line_number=1, cou
     # -----------------------------
     # PROCESS + WRITE OUTPUT CSV
     # -----------------------------
+
+
 def process_row(row, writer, current_line_number, start_time, total=2000):
+    (unique_id, addr) = (row["unique_id"], row["address"])
+    lat, lon, status = (None, None, "None")
+    lat, lon, status = geocode_arcgis(addr)
+    elapsed = time.time() - start_time
 
-        (unique_id, addr) = (row["unique_id"], row["address"])
-        lat, lon, status = (None, None, "None")
-        lat, lon, status = geocode_arcgis(addr)
-        elapsed = time.time() - start_time
+    if lat is None:
+        print(f"    [line_no:{current_line_number}] Error → {status}")
+        writer.writerow({
+            "unique_id": unique_id,
+            "address": addr,
+            "lat_gda94": None,
+            "lon_gda94": None
+        })
+    else:
+        lat_gda94, lon_gda94 = wgs84_to_gda94(lat, lon)
+        print(
+            f"[{current_line_number}/{total}] Processing {unique_id}: {addr} … Success (elapsed {elapsed:.1f}s),  {lat},  {lon},  {lat_gda94},  {lon_gda94}")
+        writer.writerow({
+            "unique_id": unique_id,
+            "address": addr,
+            "lat_wgs84": lat,
+            "lon_wgs84": lon,
+            "lat_gda94": lat_gda94,
+            "lon_gda94": lon_gda94
+        })
 
-        if lat is None:
-            print(f"    [line_no:{current_line_number}] Error → {status}")
-            writer.writerow({
-                "unique_id": unique_id,
-                "address": addr,
-                "lat_gda94": None,
-                "lon_gda94": None
-            })
-        else:
-            lat_gda94, lon_gda94 = wgs84_to_gda94(lat, lon)
-            print(f"[{current_line_number}/{total}] Processing {unique_id}: {addr} … Success (elapsed {elapsed:.1f}s),  {lat},  {lon},  {lat_gda94},  {lon_gda94}")
-            writer.writerow({
-                "unique_id": unique_id,
-                "address": addr,
-                "lat_wgs84": lat,
-                "lon_wgs84": lon,
-                "lat_gda94": lat_gda94,
-                "lon_gda94": lon_gda94
-            })
-
-        time.sleep(0.25)   # Nominatim rate limit
-
+    time.sleep(0.25)  # Nominatim rate limit
 
 
 if __name__ == "__main__":
-
     start_time = time.time()
 
     input_file = "latest_prod_addresses_remaining.csv"
     count = 2000
 
     # first 2000 i.e., 1 to 2000 addresses
-    #start_line_number = 1
-
+    # start_line_number = 1
 
     # second 2000 i.e., 2001 to 4000 addresses
-    #start_line_number = 2000
-
-
+    # start_line_number = 2000
 
     # this sample "addresses_34000.csv"
-    input_file = "latest_prod_addresses_remaining.csv"
-    start_line_number = 19001
-    count = 38000
+    # input_file = "latest_prod_addresses_remaining.csv"
+    # input_file = "C:/temp/geocoding/new_45k_addresses.csv"
+    input_file = "C:/Users/mchalla.PC01/PycharmProjects/addressGeocoding/new_45k_addresses.csv"
+    start_line_number = 1
+    count = 10
 
-
-    (output_file, start_line_number) = process_input_addresses(
+    (output_file, end_line_number) = process_input_addresses(
         input_file=input_file,
         start_line_number=start_line_number,
         count=count if count else 2000,
         start_time=start_time,
-        filename_suffix=str(start_line_number)+"_"+str(count)
+        filename_suffix=str(start_line_number) + "_" + str(count)
     )
 
     # Compute total time AFTER loop finishes
     total_time = time.time() - start_time
 
-    print(f"Done. Results saved to {output_file} (rows {1}-{start_line_number})")
+    print(f"Done. Results saved to {output_file} (rows {start_line_number}-{end_line_number})")
     print(f"Total time taken: {total_time:.1f} seconds")
