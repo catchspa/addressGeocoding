@@ -1,0 +1,67 @@
+#!/bin/sh
+prefix=$OSGEO4W_ROOT_MSYS
+exec_prefix=$OSGEO4W_ROOT_MSYS/bin
+libdir=$OSGEO4W_ROOT_MSYS/lib
+
+usage()
+{
+	cat <<EOF
+Usage: pdal-config [OPTIONS]
+Options:
+	[--cflags]
+	[--cxxflags]
+	[--defines]
+	[--includes]
+	[--libs]
+	[--plugin-dir]
+	[--version]
+EOF
+	exit $1
+}
+
+if test $# -eq 0; then
+	usage 1 1>&2
+fi
+
+case $1 in
+  --libs)
+    echo -L$OSGEO4W_ROOT_MSYS/lib -lpdalcpp
+    ;;
+
+  --plugin-dir)
+    echo ../install/apps/pdal/plugins
+    ;;
+
+  --prefix)
+    echo ${prefix}
+     ;;
+
+  --ldflags)
+    echo -L${libdir}
+    ;;
+
+  --defines)
+    echo 
+    ;;
+
+  --includes)
+    echo -I$OSGEO4W_ROOT_MSYS/include -I$OSGEO4W_ROOT_MSYS/include/libxml2
+    ;;
+
+  --cflags)
+    echo /DWIN32 /D_WINDOWS /W3
+    ;;
+
+  --cxxflags)
+    echo /DWIN32 /D_WINDOWS /W3 /GR /EHsc
+    ;;
+
+  --version)
+    echo 2.10.0
+    ;;
+
+  *)
+    usage 1 1>&2
+    ;;
+
+esac
